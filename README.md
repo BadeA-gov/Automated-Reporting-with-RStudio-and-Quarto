@@ -4,9 +4,15 @@ Workshop for NYC NED AFS. Files walk through how to automate reporting/visualiza
 Files include:
 
 Automated Reporting in R: the Quarto document that Andrew Bade is presenting.
+
 expanded_reporting_data: example data used for demonstration.
+
 Writing Functions: all of the functions and testing from Part 1.
+
 my_functions: a source file of user-generated functions.
+
 Waterbody Survey Report A: a basic Quarto report.
+
 Waterbody Survey Report B: a parameterized Quarto report.
+
 Driver Script: an R script that batch-generates reports.
