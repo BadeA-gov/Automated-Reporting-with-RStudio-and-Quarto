@@ -50,7 +50,7 @@ First, let's load our libraries and example data.
 #| label: Loading packages and example data
 #| message: false #notice that console messages are muted from the report for this code chunk
 library(tidyverse)
-fish_data <- read.csv("C:/Users/BadeA/OneDrive - State of Connecticut/Automated Reporting Workshop/expanded_reporting_data.csv")
+fish_data <- read.csv("expanded_reporting_data.csv")
 ```
 
 ### Step 1: Write the Function
