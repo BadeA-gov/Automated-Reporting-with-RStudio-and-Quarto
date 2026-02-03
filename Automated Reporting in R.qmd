@@ -1,0 +1,476 @@
+---
+title: "Automated Reporting with R"
+format: 
+  html:
+    toc: true
+    code-fold: show
+---
+
+# Part 1: User-Generated Functions in R
+
+## 1. Why Functions? (The DRY Principle)
+
+In automated reporting, our goal is to move away from "Copy-Paste-Tweak" workflows.
+
+**DRY** stands for **Don't Repeat Yourself**.
+
+-   **Consistency:** If you change the logic (e.g., a calculation or a plot color), you only change it in *one* place.
+-   **Readability:** High-level functions tell a story (e.g., `generate_site_report()`) instead of showing 50 lines of data cleaning.
+-   **Automation:** Functions allow us to loop over variables (like year or waterbody identifier) to generate multiple outputs.
+
+------------------------------------------------------------------------
+
+## 2. Anatomy of an R Function
+
+Every function in R has three main components:
+
+1.  **Arguments (Inputs):** The data or settings the function needs to run.
+2.  **Body:** The "workhorse" code inside the curly braces `{ }`.
+3.  **Return Value (Output):** The final result (a table, a plot, or a value) sent back to the user.
+
+```{r}
+function_name <- function(argument1, argument2) { #1. Arguments
+result <- argument1 + argument2 #2. Body
+return(result) } #Return Value (Output)
+
+function_name(2, 2)
+```
+
+------------------------------------------------------------------------
+
+## 3. Live Coding: Building a Reporting Function
+
+Let's build a function that develops basic summary stats on our fish data. We want to be able to pass it our dataset and tell it which **variable** we want to group by (e.g., `Species` or `Year`).
+
+### Setup
+
+First, let's load our libraries and example data.
+
+```{r}
+#| label: Loading packages and example data
+#| message: false #notice that console messages are muted from the report for this code chunk
+library(tidyverse)
+fish_data <- read.csv("C:/Users/BadeA/OneDrive - State of Connecticut/Automated Reporting Workshop/expanded_reporting_data.csv")
+```
+
+### Step 1: Write the Function
+
+We will use the "curly-curly" `{{ }}` operator. This is a tidyverse tool that allows us to pass column names directly into functions.
+
+```{r}
+# Define the function
+summarize_fish_stats <- function(df, group_var) {
+  
+  summary_table <- df %>%
+    group_by({{ group_var }}) %>%
+    summarise(
+      count = n(),
+      min_length = min(Total_Length, na.rm = TRUE),
+      avg_length = mean(Total_Length, na.rm = TRUE),
+      max_length = max(Total_Length, na.rm = TRUE)
+    ) %>%
+    arrange(desc(avg_length))
+  
+  return(summary_table)
+}
+```
+
+### Step 2: Test the Function
+
+Now, instead of writing the `group_by` and `summarise` code every time, we just call our function.
+
+```{r}
+# Summarize by Species
+summarize_fish_stats(fish_data, Species)
+
+# Summarize by Year
+summarize_fish_stats(fish_data, Year)
+
+# Summarize by Waterbody
+summarize_fish_stats(fish_data, Waterbody_ID)
+```
+
+------------------------------------------------------------------------
+
+## 4. Create a Visualization Function
+
+### Plot length distribution with one grouping variable.
+
+Write a function called `plot_fish_lengths` that takes the dataframe and a grouping variable, and returns a boxplot of `Total_Length`.
+
+```{r}
+plot_fish_lengths <- function(df, group_var) {
+  
+  p <- ggplot(df, aes(x = factor({{ group_var }}), y = Total_Length, fill = factor({{ group_var }}))) +
+    geom_boxplot() +
+    labs(title = "Length Distribution", x = "Grouping Variable", y = "Total Length (mm)") +
+    theme_minimal() +
+    guides(fill = "none")
+  
+  return(p)
+}
+
+# Test it:
+plot_fish_lengths(fish_data, Waterbody_ID)
+
+# Test it:
+plot_fish_lengths(fish_data, Species)
+
+# Test it:
+plot_fish_lengths(fish_data, Year)
+```
+
+### Enhance plot with automated axis labeling.
+
+```{r}
+plot_fish_lengths <- function(df, group_var) {
+  
+  var_name <- rlang::as_label(rlang::enquo(group_var))
+  
+  p <- ggplot(df, aes(x = factor({{ group_var }}), y = Total_Length, fill = factor({{ group_var }}))) +
+    geom_boxplot() +
+    labs(title = "Length Distribution", x = var_name, y = "Total Length (mm)") +
+    theme_minimal() +
+    guides(fill = "none")
+  
+  return(p)
+}
+
+# Test it:
+plot_fish_lengths(fish_data, Waterbody_ID)
+
+# Test it:
+plot_fish_lengths(fish_data, Species)
+
+# Test it:
+plot_fish_lengths(fish_data, Year)
+```
+
+### Add a secondary grouping variable for more informative plots.
+
+```{r}
+plot_fish_comparison <- function(df, group_var, facet_var) {
+  
+  # 1. Capture labels for both variables
+  x_lab <- rlang::as_label(rlang::enquo(group_var))
+  f_lab <- rlang::as_label(rlang::enquo(facet_var))
+  
+  # 2. Build the plot
+  p <- ggplot(df, aes(x = factor({{ group_var }}), 
+                      y = Total_Length, 
+                      fill = factor({{ group_var }}))) +
+    geom_boxplot(alpha = 0.7) +
+    # Use vars() to wrap the injected facet variable
+    facet_wrap(vars({{ facet_var }})) + 
+    labs(
+      title = paste("Length Distribution:", x_lab, "by", f_lab),
+      subtitle = "Automated summary generated from expanded_reporting_data.csv",
+      x = x_lab,
+      y = "Total Length (mm)"
+    ) +
+    theme_minimal() +
+    theme(legend.position = "none")
+  
+  return(p)
+}
+
+# --- Example Use Cases ---
+
+# Example A: Species length distribution within each Waterbody
+plot_fish_comparison(fish_data, Species, Waterbody_ID)
+
+# Example B: Species length distribution across different Years
+plot_fish_comparison(fish_data, Species, Year)
+
+# Example C: Waterbody differences for each Species
+plot_fish_comparison(fish_data, Waterbody_ID, Species)
+```
+
+------------------------------------------------------------------------
+
+## 5. Exercise: Develop a Site-Specific Summary Function
+
+Create a function called `get_site_summary` that takes the dataset and a specific `Waterbody_ID` (a number), then returns a summary table showing the count and average length for each `Species` found at that specific site.
+
+```{r}
+#| eval: false
+# CHALLENGE: Write a function that filters for a specific
+# site and summarizes stats by Species. 
+# Fill in the blanks to fix the following function
+
+get_site_summary <- function(df, site_num) {
+  
+  summary <- df %>%
+    # 1. Filter the data for the specific Waterbody_ID
+    filter(Waterbody_ID == ____) %>%
+    
+    # 2. Group by Species (this is a fixed column name)
+    group_by(____) %>%
+    
+    # 3. Calculate count and average length
+    summarise(
+      n_fish = ____,
+      avg_len = mean(____, na.rm = TRUE)
+    )
+  
+  return(summary)
+}
+
+# Test it:
+get_site_summary(fish_data, 2)
+get_site_summary(fish_data, 4)
+```
+
+Here is what you should have come up with:
+
+```{r}
+get_site_summary <- function(df, site_num) {
+  
+  summary <- df %>%
+    # Use site_num directly because it is a value (e.g., 2), not a column name
+    filter(Waterbody_ID == site_num) %>%
+    group_by(Species) %>%
+    summarise(
+      n_fish = n(),
+      avg_len = mean(Total_Length, na.rm = TRUE)
+    )
+  
+  return(summary)
+}
+
+# Test
+get_site_summary(fish_data, 1)
+
+# Test
+get_site_summary(fish_data, 3)
+```
+
+# Part 2: Quarto Essentials
+
+## 1. The "Brain, Body, and Engine"
+
+A `.qmd` file is a plain text file that RStudio renders into a beautiful output. It consists of three parts:
+
+-   **The YAML (Brain):** Everything between the `---` lines at the top. It tells Quarto *how* to build the file.
+
+-   **Markdown (Body):** The text where you describe your findings.
+
+-   **Code Chunks (Engine):** The parts that actually run your R code and generate plots.
+
+### YAML Basics (The Metadata)
+
+YAML is **indentation-sensitive**. Here is a standard setup:
+
+```         
+---
+title: "Waterbody Survey Report"
+author: "Your Name"
+format: 
+  html:
+    toc: true \# Adds a Table of Contents
+    code-fold: true \# Hides code behind a "Click to show" button
+    theme: cosmo \# Changes the visual style
+---
+```
+
+### Markdown Narrative (Formatting the Story)
+
+Markdown allows you to format text. Here are a few essential syntax rules:
+
+-   **Headers:** Use `#` for the Title, `##` for Sections, and `###` for Sub-sections.
+
+-   **Emphasis:** `*italics*` or `**bold**`.
+
+-   **Lists:** Use `-` or `*` for bullets.
+
+-   **Inline Code:** This is vital for automation. Instead of typing "There are 4 sites," write: `` There are `r length(unique(fish_data$Waterbody_ID))` sites. ``
+
+### Code Chunks Syntax
+
+Code chunks are "islands" of R code. To create one:
+
+-   **Keyboard Shortcut:** `Ctrl + Alt + I` (Windows) or `Cmd + Option + I` (Mac).
+
+-   Typing "/" in the visual editor also brings up a drop down of options including R code chunks.
+
+```{r}
+# This is an R code chunk
+plot(1:10)
+```
+
+**Chunk Options (`#|`):** These are instructions written at the very top of a chunk to control its behavior.
+
+-   `#| echo: false`: Show the plot, but hide the code (best for final reports).
+
+-   `#| warning: false`: Hide "Warning" messages from R.
+
+-   `#| label: fig-site-plot`: Gives the chunk a name for internal referencing.
+
+------------------------------------------------------------------------
+
+## 2. The "Render" Cycle
+
+To produce the report, you hit "Render".
+
+1.  When you click Render, R starts a fresh, clean session.
+
+2.  If you forgot to call `library(tidyverse)` inside the document (even if you run it in the console), the render will fail.
+
+3.  This "Clean Room" approach is what makes Quarto reports reproducible.
+
+------------------------------------------------------------------------
+
+## 3. Source vs. Visual Editor
+
+RStudio provides two ways to look at a Quarto file. There are toggle buttons at the top-left of the script pane:
+
+-   **Source Editor:** Shows the "raw" code (better for precision and seeing exactly what the computer sees).
+
+-   **Visual Editor:** Looks like Microsoft Word. It renders bolding, images, and tables in real-time.
+
+-   **Recommendation:** Suggest using Visual Mode for writing text and Source Mode for debugging code and YAML.
+
+------------------------------------------------------------------------
+
+## 4. Exercise: Create Your Own Report
+
+1.  Open your new Quarto doc and switch to **Visual Mode**.
+
+2.  Create an `## Introduction` header.
+
+3.  Write a sentence using **bold** text and an `inline code snippet` that counts the total number of rows in `fish_data`. Hint - `nrow()`.
+
+4.  Create a code chunk, set it to `#| echo: false`, and use it to display the `head()` of the data.
+
+5.  Render and check if the HTML looks correct.
+
+# Part 3: Parameterized Quarto Reports
+
+## 1. Organizing the Workspace
+
+For a clean automation workflow, we separate the **Logic** from the **Presentation**.
+
+-   **`functions.R`**: A script containing all the functions you wrote in Part 1.
+
+-   **`report.qmd`**: The Quarto file that calls those functions to build the visual report.
+
+Save your `plot_fish_comparison` and `get_site_summary` functions into a file named `my_functions.R` in your project folder.
+
+------------------------------------------------------------------------
+
+## 2. Introducing Parameters (The YAML "Input")
+
+Parameters are the "dials" on your report. Instead of hard-coding `Waterbody_ID = 1`, we use a placeholder.
+
+Add the `params` key to your YAML. Note the colon and the indentation:
+
+```         
+---
+title: "Waterbody Biological Summary"
+params:
+  site_id: 1
+format: html
+---
+```
+
+------------------------------------------------------------------------
+
+## 3. The Setup: Sourcing and Filtering
+
+Now, inside the first code chunk of the Quarto doc, we need to do three things:
+
+1.  Load the libraries.
+
+2.  **Source** the function script.
+
+3.  Use the **parameter** to filter the data.
+
+```{r}
+#| label: setup
+#| include: false
+#| eval: false
+
+library(tidyverse)
+source("my_functions.R") # Pulls in your custom code
+
+# Load the full dataset
+all_fish <- read_csv("expanded_reporting_data.csv")
+
+# Create a 'site_only' dataset based on the YAML parameter
+site_data <- all_fish %>% 
+  filter(Waterbody_ID == params$site_id)
+```
+
+------------------------------------------------------------------------
+
+## 4. Building the Dynamic Report
+
+Now, instead of writing new code for every site, we simply call our functions and use **inline R code** to make the text update itself:
+
+Report for Waterbody \#"r params\$site_id"
+
+During this survey, we captured a total of **"r nrow(site_data)"** fish. The average length of all species combined was **"round(mean(site_data\$Total_Length), 1)" mm**.
+
+### Species Composition
+
+The table below shows the breakdown for this specific site:
+
+```{r}
+#| echo: false
+#| eval: false
+# Calling the function from Part 1
+get_site_summary(site_data)
+```
+
+### Length Distribution
+
+```{r}
+#| echo: false
+#| eval: false
+# Calling the plotting function from Part 1
+plot_fish_lengths(site_data, Species)
+```
+
+------------------------------------------------------------------------
+
+## 5. Testing the Automation
+
+Now rerun with different site_id.
+
+1.  **Render** the report for `site_id: 1`.
+2.  Go back to the YAML, change it to `site_id: 4`.
+3.  **Render** again.
+4.  Watch as the headers, the total counts in the text, the table rows, and the boxplots all update instantly.
+
+------------------------------------------------------------------------
+
+## 6. Batch Rendering
+
+The last step is to make a "Driver Script." This is how you generate all reports at once without clicking "Render" four times. Create a separate `.R` script:
+
+```{r}
+#| eval: false
+library(quarto)
+
+# Get a list of all unique site IDs
+sites <- c(1, 2, 3, 4)
+
+# Loop through and render a report for each
+for (s in sites) {
+  quarto_render(
+    input = "report.qmd",
+    execute_params = list(site_id = s),
+    output_file = paste0("Report_Site_", s, ".html")
+  )
+}
+```
+
+# Discussion
+
+-   This workflow is DRY: If the boss wants the boxplots to be blue instead of grey, you change the color in *one* function (`my_functions.R`), re-run the loop, and all 100 reports are updated in seconds.
+
+-   This workflow is scalable. It works equally well for 4 sites or 4,000 sites.
+
+-   This workflow is reproducible. You can send someone the data and the code, and they will get the exact same results
+
+My hope is that a variant of this workflow will apply to your own use cases. R and Quarto have large, active user bases so there are regular improvements and multiple forums for troubleshooting. Another advantage of a large user base is a lot of training data for LLMs, which are remarkably effective for this use case. I am also happy to help and can be reached at andrew.bade\@ct.gov.

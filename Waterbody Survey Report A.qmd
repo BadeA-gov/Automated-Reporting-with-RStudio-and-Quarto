@@ -1,0 +1,28 @@
+---
+title: "Waterbody Survey Report"
+author: "Your Name"
+format: 
+  html:
+   toc: true 
+   code-fold: true
+   theme: cosmo
+---
+
+```{r}
+#| label: Loading packages and example data
+#| message: false #notice that console messages are muted from the report for this code chunk
+#| echo: false
+library(tidyverse)
+fish_data <- read.csv("expanded_reporting_data.csv")
+```
+
+## Introduction
+
+Biologists measured `{r} nrow(fish_data)` individuals of four different species of **fish**.
+
+Here is some example data:
+
+```{r}
+#| echo: false
+head(fish_data)
+```

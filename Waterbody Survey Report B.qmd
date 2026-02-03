@@ -1,0 +1,48 @@
+---
+title: "Waterbody Survey Report"
+author: "Your Name"
+format: 
+  html:
+   toc: true 
+   code-fold: true
+   theme: cosmo
+params:
+  site_id: 1
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+source("my_functions.R") # Pulls in your custom code
+
+# Load the full dataset
+all_fish <- read_csv("expanded_reporting_data.csv")
+
+# Create a 'site_only' dataset based on the YAML parameter
+site_data <- all_fish %>% 
+  filter(Waterbody_ID == params$site_id)
+```
+
+## Report for Waterbody \# `{r} params$site_id`
+
+During this survey, we captured a total of **`{r} nrow(site_data)`** fish. The average length of all species combined was **`{r} round(mean(site_data$Total_Length), 1)` mm**.
+
+### Species Composition
+
+The table below shows the breakdown for this specific site:
+
+```{r}
+#| echo: false
+# Calling the function from Part 1
+get_site_summary(site_data, params$site_id)
+```
+
+### Length Distribution
+
+```{r}
+#| echo: false
+# Calling the plotting function from Part 1
+plot_fish_lengths(site_data, Species)
+```
